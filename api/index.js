@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -14,8 +15,15 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '');
 
-// Basic root response so the rewrite from Vercel `/` -> `/api` does not 404
+const frontendHtmlPath = path.join(__dirname, '../public/index.html');
+
+// Serve the lightweight reporting UI on the root path so players have an easy entry point
 app.get('/', (req, res) => {
+  res.sendFile(frontendHtmlPath);
+});
+
+// Keep the previous JSON help text under a dedicated endpoint for reference
+app.get('/api-info', (req, res) => {
   res.json({
     ok: true,
     name: 'Lorcana Tracker API',

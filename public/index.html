@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lorcana Match Reporter</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(135deg, #1f2937, #0f172a);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #f8fafc;
+      }
+      main {
+        width: min(900px, 95vw);
+        display: grid;
+        gap: 2rem;
+        padding: 2.5rem;
+        background: rgba(15, 23, 42, 0.85);
+        border-radius: 20px;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(12px);
+      }
+      header h1 {
+        margin: 0;
+        font-size: clamp(2rem, 3vw + 1rem, 3rem);
+        color: #fde68a;
+      }
+      header p {
+        margin: 0.5rem 0 0;
+        color: rgba(248, 250, 252, 0.85);
+      }
+      section {
+        background: rgba(30, 41, 59, 0.8);
+        border-radius: 16px;
+        padding: 1.75rem;
+        display: grid;
+        gap: 1.5rem;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      section h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #fbbf24;
+      }
+      form {
+        display: grid;
+        gap: 1.25rem;
+      }
+      label {
+        display: grid;
+        gap: 0.4rem;
+        font-weight: 600;
+        color: #f8fafc;
+      }
+      input,
+      select,
+      button {
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        font-family: inherit;
+        background: rgba(15, 23, 42, 0.85);
+        color: inherit;
+        transition: border 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: #fbbf24;
+        box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.25);
+      }
+      button {
+        cursor: pointer;
+        font-weight: 700;
+        background: linear-gradient(135deg, #f59e0b, #f97316);
+        border: none;
+        color: #0f172a;
+        box-shadow: 0 12px 25px rgba(249, 115, 22, 0.35);
+      }
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 30px rgba(249, 115, 22, 0.45);
+      }
+      .inline {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .inline input {
+        flex: 1;
+        min-width: 200px;
+      }
+      .message {
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+      .message.success {
+        background: rgba(34, 197, 94, 0.15);
+        color: #bbf7d0;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+      }
+      .message.error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fecaca;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+      }
+      .result-card {
+        background: rgba(15, 23, 42, 0.85);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        display: grid;
+        gap: 0.5rem;
+      }
+      .result-card strong {
+        color: #fbbf24;
+      }
+      @media (max-width: 640px) {
+        main {
+          padding: 1.75rem;
+        }
+        section {
+          padding: 1.25rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Lorcana Match Reporter</h1>
+        <p>Record matchups and look up the latest deck a player has submitted.</p>
+      </header>
+
+      <section>
+        <h2>Report a Matchup</h2>
+        <form id="report-form">
+          <label>
+            Player name
+            <input
+              id="player-input"
+              name="player"
+              list="player-names"
+              placeholder="Search or enter a player"
+              autocomplete="off"
+              required
+            />
+            <datalist id="player-names"></datalist>
+          </label>
+
+          <label>
+            Deck
+            <select id="deck-select" name="deck" required>
+              <option value="" disabled selected>Select a deck</option>
+            </select>
+          </label>
+
+          <button type="submit">Submit matchup</button>
+        </form>
+        <div id="report-message" role="status"></div>
+      </section>
+
+      <section>
+        <h2>Lookup a Player</h2>
+        <form id="lookup-form" class="inline">
+          <input
+            id="lookup-input"
+            name="lookup"
+            list="player-names"
+            placeholder="Start typing a player name"
+            autocomplete="off"
+            required
+          />
+          <button type="submit">Search</button>
+        </form>
+        <div id="lookup-result" role="status"></div>
+      </section>
+    </main>
+
+    <script>
+      const playerDatalist = document.getElementById('player-names');
+      const deckSelect = document.getElementById('deck-select');
+      const reportForm = document.getElementById('report-form');
+      const reportMessage = document.getElementById('report-message');
+      const lookupForm = document.getElementById('lookup-form');
+      const lookupResult = document.getElementById('lookup-result');
+
+      function setMessage(element, message, type) {
+        element.textContent = message || '';
+        element.className = type ? `message ${type}` : 'message';
+      }
+
+      function clearMessage(element) {
+        element.textContent = '';
+        element.className = '';
+      }
+
+      async function loadPlayers() {
+        try {
+          const response = await fetch('/players');
+          if (!response.ok) throw new Error('Unable to load players');
+          const players = await response.json();
+          playerDatalist.replaceChildren(
+            ...players.map((name) => {
+              const option = document.createElement('option');
+              option.value = name;
+              return option;
+            })
+          );
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      async function loadDecks() {
+        try {
+          const response = await fetch('/decks');
+          if (!response.ok) throw new Error('Unable to load decks');
+          const decks = await response.json();
+          deckSelect.replaceChildren(
+            new Option('Select a deck', '', true, true),
+            ...decks.map((name) => new Option(name, name))
+          );
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      reportForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        clearMessage(reportMessage);
+
+        const formData = new FormData(reportForm);
+        const player = formData.get('player')?.trim();
+        const deck = formData.get('deck');
+
+        if (!player || !deck) {
+          setMessage(reportMessage, 'Player and deck are required.', 'error');
+          return;
+        }
+
+        try {
+          const response = await fetch('/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ player, deck })
+          });
+
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.error || 'Unable to record matchup');
+          }
+
+          setMessage(reportMessage, payload.message || 'Matchup recorded!', 'success');
+          reportForm.reset();
+          // Ensure the blank option remains selected after reset
+          deckSelect.selectedIndex = 0;
+          await loadPlayers();
+        } catch (error) {
+          console.error(error);
+          setMessage(reportMessage, error.message, 'error');
+        }
+      });
+
+      lookupForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        clearMessage(lookupResult);
+
+        const formData = new FormData(lookupForm);
+        const player = formData.get('lookup')?.trim();
+        if (!player) {
+          setMessage(lookupResult, 'Enter a player name to search.', 'error');
+          return;
+        }
+
+        try {
+          const response = await fetch(`/lookup/${encodeURIComponent(player)}`);
+          if (response.status === 404) {
+            setMessage(lookupResult, 'No matchup found for this player yet.', 'error');
+            return;
+          }
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.error || 'Unable to lookup player');
+          }
+
+          const card = document.createElement('div');
+          card.className = 'result-card';
+          card.innerHTML = `
+            <div><strong>Player:</strong> ${payload.player || player}</div>
+            <div><strong>Deck:</strong> ${payload.deck || 'Unknown'}</div>
+            ${payload.created_at ? `<div><strong>Reported:</strong> ${new Date(payload.created_at).toLocaleString()}</div>` : ''}
+          `;
+          lookupResult.replaceChildren(card);
+        } catch (error) {
+          console.error(error);
+          setMessage(lookupResult, error.message, 'error');
+        }
+      });
+
+      loadPlayers();
+      loadDecks();
+    </script>
+  </body>
+</html>
