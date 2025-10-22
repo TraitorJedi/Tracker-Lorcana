@@ -14,6 +14,14 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '');
 
+// Basic root response so the rewrite from Vercel `/` -> `/api` does not 404
+app.get('/', (req, res) => {
+  res.json({
+    ok: true,
+    message: 'Lorcana Tracker API root. See /health for status and other endpoints for data.'
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
