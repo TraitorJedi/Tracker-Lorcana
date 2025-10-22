@@ -1,13 +1,17 @@
 {
-  "name": "match-tracker-node",
+  "name": "supa-lorcana-match-tracker",
   "version": "1.0.0",
-  "description": "Simple API for match tracker",
+  "description": "Express API for Lorcana match tracker using Supabase on Vercel",
   "main": "api/index.js",
   "scripts": {
     "dev": "node api/index.js"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "express": "^4.21.2",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "@supabase/supabase-js": "^2.45.0"
   }
 }
