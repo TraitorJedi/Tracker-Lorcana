@@ -1,0 +1,13 @@
+{
+  "name": "match-tracker-node",
+  "version": "1.0.0",
+  "description": "Simple API for match tracker",
+  "main": "api/index.js",
+  "scripts": {
+    "dev": "node api/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5"
+  }
+}
