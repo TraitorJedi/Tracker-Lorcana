@@ -18,7 +18,28 @@ const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '');
 app.get('/', (req, res) => {
   res.json({
     ok: true,
-    message: 'Lorcana Tracker API root. See /health for status and other endpoints for data.'
+    name: 'Lorcana Tracker API',
+    message: 'Use the endpoints below to read players/decks, submit entries, or look up the latest submission.',
+    endpoints: [
+      { method: 'GET', path: '/health', description: 'Health probe used by Vercel/monitors.' },
+      { method: 'GET', path: '/players', description: 'List of player names pulled from Supabase.' },
+      { method: 'GET', path: '/decks', description: 'List of decks pulled from Supabase.' },
+      {
+        method: 'POST',
+        path: '/submit',
+        description: 'Record that a player is using a deck. Creates the player if needed.',
+        body: { player: 'Your Player', deck: 'Amber/Amethyst' }
+      },
+      {
+        method: 'GET',
+        path: '/lookup/:player',
+        description: 'Fetch the most recent submission for a player.'
+      }
+    ],
+    notes: [
+      'Set SUPABASE_URL and SUPABASE_KEY environment variables in Vercel for data access.',
+      'Seed the database with supabase/setup.sql before using submit endpoints.'
+    ]
   });
 });
 

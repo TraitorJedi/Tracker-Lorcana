@@ -9,6 +9,25 @@ Simple Express API deployed on Vercel that connects to Supabase (PostgreSQL).
 - `POST /submit` JSON: `{ "player": "Nikita", "deck": "Amber/Amethyst" }`
 - `GET /lookup/:player`
 
+### Example usage
+
+```bash
+# Check that the API is up
+curl https://tracker-lorcana.vercel.app/health
+
+# List known players and decks
+curl https://tracker-lorcana.vercel.app/players
+curl https://tracker-lorcana.vercel.app/decks
+
+# Record a submission
+curl -X POST https://tracker-lorcana.vercel.app/submit \
+  -H 'Content-Type: application/json' \
+  -d '{"player":"Nikita","deck":"Amber/Amethyst"}'
+
+# Look up the last deck submitted for a player
+curl https://tracker-lorcana.vercel.app/lookup/Nikita
+```
+
 ## Setup
 
 1) **Create Supabase project** → copy your Project URL + Anon Key.  
