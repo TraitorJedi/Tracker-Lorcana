@@ -152,7 +152,7 @@
               id="player-input"
               name="player"
               list="player-names"
-              placeholder="Search or enter a player"
+              placeholder="Select a player from the list"
               autocomplete="off"
               required
             />
@@ -178,7 +178,7 @@
             id="lookup-input"
             name="lookup"
             list="player-names"
-            placeholder="Start typing a player name"
+            placeholder="Select a player from the list"
             autocomplete="off"
             required
           />
@@ -195,6 +195,7 @@
       const reportMessage = document.getElementById('report-message');
       const lookupForm = document.getElementById('lookup-form');
       const lookupResult = document.getElementById('lookup-result');
+      const playerMap = new Map();
 
       function setMessage(element, message, type) {
         element.textContent = message || '';
@@ -211,6 +212,8 @@
           const response = await fetch('/players');
           if (!response.ok) throw new Error('Unable to load players');
           const players = await response.json();
+          playerMap.clear();
+          players.forEach((name) => playerMap.set(name.toLowerCase(), name));
           playerDatalist.replaceChildren(
             ...players.map((name) => {
               const option = document.createElement('option');
@@ -250,11 +253,17 @@
           return;
         }
 
+        const matchedPlayer = playerMap.get(player.toLowerCase());
+        if (!matchedPlayer) {
+          setMessage(reportMessage, 'Select an existing player from the list.', 'error');
+          return;
+        }
+
         try {
           const response = await fetch('/submit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player, deck })
+            body: JSON.stringify({ player: matchedPlayer, deck })
           });
 
           const payload = await response.json();
@@ -284,8 +293,10 @@
           return;
         }
 
+        const lookupName = playerMap.get(player.toLowerCase()) || player;
+
         try {
-          const response = await fetch(`/lookup/${encodeURIComponent(player)}`);
+          const response = await fetch(`/lookup/${encodeURIComponent(lookupName)}`);
           if (response.status === 404) {
             setMessage(lookupResult, 'No matchup found for this player yet.', 'error');
             return;
@@ -298,7 +309,7 @@
           const card = document.createElement('div');
           card.className = 'result-card';
           card.innerHTML = `
-            <div><strong>Player:</strong> ${payload.player || player}</div>
+            <div><strong>Player:</strong> ${payload.player || lookupName}</div>
             <div><strong>Deck:</strong> ${payload.deck || 'Unknown'}</div>
             ${payload.created_at ? `<div><strong>Reported:</strong> ${new Date(payload.created_at).toLocaleString()}</div>` : ''}
           `;
