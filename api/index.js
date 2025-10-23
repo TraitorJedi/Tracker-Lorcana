@@ -35,7 +35,7 @@ app.get('/api-info', (req, res) => {
       {
         method: 'POST',
         path: '/submit',
-        description: 'Record that a player is using a deck. Creates the player if needed.',
+        description: 'Record that a player is using a deck. Player must already exist.',
         body: { player: 'Your Player', deck: 'Amber/Amethyst' }
       },
       {
@@ -76,15 +76,13 @@ app.post('/submit', async (req, res) => {
     const { player, deck } = req.body || {};
     if (!player || !deck) return res.status(400).json({ error: 'Missing "player" or "deck"' });
 
-    // Ensure player exists (create if missing)
-    let { data: p, error: pErr } = await supabase.from('players').select('id,name').eq('name', player).single();
+    // Ensure player exists
+    const { data: p, error: pErr } = await supabase.from('players').select('id,name').eq('name', player).single();
     if (pErr && pErr.code !== 'PGRST116') { // not "Results contain 0 rows"
       return res.status(500).json({ error: pErr.message });
     }
     if (!p) {
-      const { data: insertedP, error: insPErr } = await supabase.from('players').insert({ name: player }).select('id,name').single();
-      if (insPErr) return res.status(500).json({ error: insPErr.message });
-      p = insertedP;
+      return res.status(400).json({ error: `Player not found: ${player}` });
     }
 
     // Require deck to already exist (from your seeded list)
