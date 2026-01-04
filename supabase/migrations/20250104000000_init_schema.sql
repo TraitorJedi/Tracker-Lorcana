@@ -1,3 +1,6 @@
+-- Enable UUID generation
+create extension if not exists "pgcrypto";
+
 -- Players table
 create table if not exists players (
   id uuid default gen_random_uuid() primary key,
@@ -31,22 +34,3 @@ alter table submissions
 
 create unique index if not exists submissions_event_player_unique
   on submissions(event_id, player_id);
-
--- Seed dual-color decks
-insert into decks (name) values
-  ('Amber/Amethyst'),
-  ('Amber/Emerald'),
-  ('Amber/Ruby'),
-  ('Amber/Sapphire'),
-  ('Amber/Steel'),
-  ('Amethyst/Emerald'),
-  ('Amethyst/Ruby'),
-  ('Amethyst/Sapphire'),
-  ('Amethyst/Steel'),
-  ('Emerald/Ruby'),
-  ('Emerald/Sapphire'),
-  ('Emerald/Steel'),
-  ('Ruby/Sapphire'),
-  ('Ruby/Steel'),
-  ('Sapphire/Steel')
-on conflict (name) do nothing;

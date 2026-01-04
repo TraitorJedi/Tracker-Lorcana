@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lorcana Admin Login</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at top, #1f2937, #0f172a 55%);
+        color: #f8fafc;
+      }
+      main {
+        width: min(480px, 92vw);
+        padding: 2rem;
+        background: rgba(15, 23, 42, 0.9);
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.6);
+        display: grid;
+        gap: 1.25rem;
+      }
+      h1 {
+        margin: 0;
+        font-size: 2rem;
+        color: #fcd34d;
+      }
+      p {
+        margin: 0;
+        color: rgba(248, 250, 252, 0.75);
+      }
+      form {
+        display: grid;
+        gap: 1rem;
+      }
+      label {
+        display: grid;
+        gap: 0.4rem;
+        font-weight: 600;
+      }
+      input,
+      button {
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        padding: 0.7rem 1rem;
+        font-size: 1rem;
+        font-family: inherit;
+        background: rgba(15, 23, 42, 0.85);
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+        font-weight: 700;
+        border: none;
+        color: #0f172a;
+        background: linear-gradient(135deg, #f59e0b, #f97316);
+        box-shadow: 0 12px 25px rgba(249, 115, 22, 0.35);
+      }
+      .message {
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+      .message.error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fecaca;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Admin Access</h1>
+        <p>Enter the admin password to manage events.</p>
+      </header>
+      <form id="login-form">
+        <label>
+          Password
+          <input id="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Unlock admin</button>
+      </form>
+      <div id="login-message" role="status"></div>
+    </main>
+
+    <script>
+      const form = document.getElementById('login-form');
+      const passwordInput = document.getElementById('password');
+      const message = document.getElementById('login-message');
+
+      function setMessage(text) {
+        message.textContent = text || '';
+        message.className = text ? 'message error' : '';
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setMessage('');
+        try {
+          const response = await fetch('/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: passwordInput.value })
+          });
+          if (!response.ok) {
+            const payload = await response.json();
+            throw new Error(payload.error || 'Unable to log in');
+          }
+          window.location.href = '/admin';
+        } catch (error) {
+          setMessage(error.message);
+        }
+      });
+    </script>
+  </body>
+</html>

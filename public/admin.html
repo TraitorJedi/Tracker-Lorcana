@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lorcana Admin</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #f8fafc;
+      }
+      main {
+        width: min(1100px, 96vw);
+        display: grid;
+        gap: 2rem;
+        padding: 2.5rem;
+        background: rgba(15, 23, 42, 0.88);
+        border-radius: 20px;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(12px);
+      }
+      header h1 {
+        margin: 0;
+        font-size: clamp(2rem, 3vw + 1rem, 3rem);
+        color: #fcd34d;
+      }
+      header p {
+        margin: 0.5rem 0 0;
+        color: rgba(248, 250, 252, 0.85);
+      }
+      section {
+        background: rgba(30, 41, 59, 0.85);
+        border-radius: 16px;
+        padding: 1.75rem;
+        display: grid;
+        gap: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      section h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #f59e0b;
+      }
+      form {
+        display: grid;
+        gap: 1rem;
+      }
+      label {
+        display: grid;
+        gap: 0.4rem;
+        font-weight: 600;
+      }
+      input,
+      select,
+      button {
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        padding: 0.7rem 1rem;
+        font-size: 1rem;
+        font-family: inherit;
+        background: rgba(15, 23, 42, 0.85);
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+        font-weight: 700;
+        background: linear-gradient(135deg, #f59e0b, #f97316);
+        border: none;
+        color: #0f172a;
+        box-shadow: 0 12px 25px rgba(249, 115, 22, 0.35);
+      }
+      button.secondary {
+        background: rgba(148, 163, 184, 0.2);
+        color: #f8fafc;
+        box-shadow: none;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+      }
+      button.danger {
+        background: rgba(239, 68, 68, 0.8);
+        color: #0f172a;
+      }
+      .inline {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .message {
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+      .message.success {
+        background: rgba(34, 197, 94, 0.15);
+        color: #bbf7d0;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+      }
+      .message.error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fecaca;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.75rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        vertical-align: middle;
+      }
+      th {
+        color: #fcd34d;
+        font-weight: 700;
+      }
+      .muted {
+        color: rgba(248, 250, 252, 0.65);
+      }
+      @media (max-width: 720px) {
+        main {
+          padding: 1.75rem;
+        }
+        section {
+          padding: 1.25rem;
+        }
+        table,
+        thead,
+        tbody,
+        th,
+        td,
+        tr {
+          display: block;
+        }
+        tr {
+          border: 1px solid rgba(148, 163, 184, 0.2);
+          border-radius: 12px;
+          margin-bottom: 1rem;
+          padding: 0.5rem;
+        }
+        th {
+          display: none;
+        }
+        td {
+          border-bottom: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="inline" style="justify-content: space-between;">
+          <div>
+            <h1>Lorcana Admin</h1>
+            <p>Create events and manage player color submissions.</p>
+          </div>
+          <button id="logout-button" class="secondary" type="button">Log out</button>
+        </div>
+      </header>
+
+      <section>
+        <h2>Create Event</h2>
+        <form id="create-event-form" class="inline">
+          <input id="event-name-input" type="text" placeholder="Event name" required />
+          <button type="submit">Create event</button>
+        </form>
+        <div id="create-event-message" role="status"></div>
+      </section>
+
+      <section>
+        <h2>Manage Entries</h2>
+        <form id="event-select-form">
+          <label>
+            Event
+            <select id="event-select" required>
+              <option value="" disabled selected>Select an event</option>
+            </select>
+          </label>
+        </form>
+        <div id="entries-message" role="status"></div>
+        <div id="entries-container">
+          <p class="muted">Select an event to view its entries.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Manage Players</h2>
+        <div id="players-message" role="status"></div>
+        <div id="players-container">
+          <p class="muted">Loading players...</p>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const eventSelect = document.getElementById('event-select');
+      const createEventForm = document.getElementById('create-event-form');
+      const eventNameInput = document.getElementById('event-name-input');
+      const createEventMessage = document.getElementById('create-event-message');
+      const entriesContainer = document.getElementById('entries-container');
+      const entriesMessage = document.getElementById('entries-message');
+      const logoutButton = document.getElementById('logout-button');
+      const playersContainer = document.getElementById('players-container');
+      const playersMessage = document.getElementById('players-message');
+
+      let players = [];
+      let decks = [];
+
+      function setMessage(element, message, type) {
+        element.textContent = message || '';
+        element.className = type ? `message ${type}` : 'message';
+      }
+
+      function clearMessage(element) {
+        element.textContent = '';
+        element.className = '';
+      }
+
+      async function loadPlayers() {
+        const response = await fetch('/players', { credentials: 'same-origin' });
+        if (!response.ok) throw new Error('Unable to load players');
+        players = await response.json();
+      }
+
+      async function loadDecks() {
+        const response = await fetch('/decks', { credentials: 'same-origin' });
+        if (!response.ok) throw new Error('Unable to load decks');
+        decks = await response.json();
+      }
+
+      async function loadEvents() {
+        const response = await fetch('/admin/events', { credentials: 'same-origin' });
+        if (response.status === 401) throw new Error('Unauthorized. Refresh to re-enter the admin password.');
+        if (!response.ok) throw new Error('Unable to load events');
+        const events = await response.json();
+        eventSelect.replaceChildren(
+          new Option('Select an event', '', true, true),
+          ...events.map((event) => new Option(event.name, event.id))
+        );
+        if (!events.length) {
+          entriesContainer.innerHTML = '<p class="muted">No events yet. Create one above.</p>';
+        }
+      }
+
+      function buildOptions(list, selectedValue) {
+        return list.map((value) => {
+          const option = new Option(value, value);
+          if (value === selectedValue) option.selected = true;
+          return option;
+        });
+      }
+
+      async function loadEntries(eventId) {
+        clearMessage(entriesMessage);
+        entriesContainer.innerHTML = '<p class="muted">Loading entries...</p>';
+        const response = await fetch(`/admin/events/${eventId}/entries`, { credentials: 'same-origin' });
+        if (response.status === 401) {
+          setMessage(entriesMessage, 'Unauthorized. Refresh to re-enter the admin password.', 'error');
+          return;
+        }
+        if (!response.ok) {
+          setMessage(entriesMessage, 'Unable to load entries.', 'error');
+          return;
+        }
+        const entries = await response.json();
+        if (!entries.length) {
+          entriesContainer.innerHTML = '<p class="muted">No entries for this event yet.</p>';
+          return;
+        }
+
+        const table = document.createElement('table');
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Deck</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+
+        const tbody = table.querySelector('tbody');
+        entries.forEach((entry) => {
+          const row = document.createElement('tr');
+          row.dataset.id = entry.id;
+
+          const playerCell = document.createElement('td');
+          const playerSelect = document.createElement('select');
+          playerSelect.append(...buildOptions(players, entry.player));
+          playerCell.appendChild(playerSelect);
+
+          const deckCell = document.createElement('td');
+          const deckSelect = document.createElement('select');
+          deckSelect.append(...buildOptions(decks, entry.deck));
+          deckCell.appendChild(deckSelect);
+
+          const timeCell = document.createElement('td');
+          timeCell.textContent = entry.created_at ? new Date(entry.created_at).toLocaleString() : '—';
+
+          const actionCell = document.createElement('td');
+          const saveButton = document.createElement('button');
+          saveButton.textContent = 'Save';
+          saveButton.className = 'secondary';
+          const deleteButton = document.createElement('button');
+          deleteButton.textContent = 'Delete';
+          deleteButton.className = 'danger';
+
+          saveButton.addEventListener('click', async () => {
+            try {
+              const payload = {
+                player: playerSelect.value,
+                deck: deckSelect.value
+              };
+              const updateResponse = await fetch(`/admin/entries/${entry.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+              });
+              if (!updateResponse.ok) {
+                const errorPayload = await updateResponse.json();
+                throw new Error(errorPayload.error || 'Unable to update entry');
+              }
+              setMessage(entriesMessage, 'Entry updated.', 'success');
+            } catch (error) {
+              setMessage(entriesMessage, error.message, 'error');
+            }
+          });
+
+          deleteButton.addEventListener('click', async () => {
+            if (!confirm('Delete this entry?')) return;
+            try {
+              const deleteResponse = await fetch(`/admin/entries/${entry.id}`, {
+                method: 'DELETE',
+                credentials: 'same-origin'
+              });
+              if (!deleteResponse.ok) {
+                const errorPayload = await deleteResponse.json();
+                throw new Error(errorPayload.error || 'Unable to delete entry');
+              }
+              row.remove();
+              setMessage(entriesMessage, 'Entry deleted.', 'success');
+            } catch (error) {
+              setMessage(entriesMessage, error.message, 'error');
+            }
+          });
+
+          actionCell.append(saveButton, deleteButton);
+          row.append(playerCell, deckCell, timeCell, actionCell);
+          tbody.appendChild(row);
+        });
+
+        entriesContainer.replaceChildren(table);
+      }
+
+      async function loadPlayerAdminList() {
+        clearMessage(playersMessage);
+        playersContainer.innerHTML = '<p class="muted">Loading players...</p>';
+        const response = await fetch('/admin/players', { credentials: 'same-origin' });
+        if (response.status === 401) {
+          setMessage(playersMessage, 'Unauthorized. Refresh to re-enter the admin password.', 'error');
+          return;
+        }
+        if (!response.ok) {
+          setMessage(playersMessage, 'Unable to load players.', 'error');
+          return;
+        }
+        const data = await response.json();
+        if (!data.length) {
+          playersContainer.innerHTML = '<p class="muted">No players recorded yet.</p>';
+          return;
+        }
+
+        const table = document.createElement('table');
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+        data.forEach((player) => {
+          const row = document.createElement('tr');
+          row.dataset.id = player.id;
+
+          const nameCell = document.createElement('td');
+          const nameInput = document.createElement('input');
+          nameInput.type = 'text';
+          nameInput.value = player.name;
+          nameCell.appendChild(nameInput);
+
+          const actionCell = document.createElement('td');
+          const saveButton = document.createElement('button');
+          saveButton.textContent = 'Save';
+          saveButton.className = 'secondary';
+          const deleteButton = document.createElement('button');
+          deleteButton.textContent = 'Delete';
+          deleteButton.className = 'danger';
+
+          saveButton.addEventListener('click', async () => {
+            try {
+              const response = await fetch(`/admin/players/${player.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ name: nameInput.value.trim() })
+              });
+              if (!response.ok) {
+                const payload = await response.json();
+                throw new Error(payload.error || 'Unable to update player');
+              }
+              setMessage(playersMessage, 'Player updated.', 'success');
+              await loadPlayers();
+              await loadPlayerAdminList();
+              if (eventSelect.value) {
+                await loadEntries(eventSelect.value);
+              }
+            } catch (error) {
+              setMessage(playersMessage, error.message, 'error');
+            }
+          });
+
+          deleteButton.addEventListener('click', async () => {
+            if (!confirm('Delete this player and related entries?')) return;
+            try {
+              const response = await fetch(`/admin/players/${player.id}`, {
+                method: 'DELETE',
+                credentials: 'same-origin'
+              });
+              if (!response.ok) {
+                const payload = await response.json();
+                throw new Error(payload.error || 'Unable to delete player');
+              }
+              row.remove();
+              setMessage(playersMessage, 'Player deleted.', 'success');
+              await loadPlayers();
+              await loadPlayerAdminList();
+              if (eventSelect.value) {
+                await loadEntries(eventSelect.value);
+              }
+            } catch (error) {
+              setMessage(playersMessage, error.message, 'error');
+            }
+          });
+
+          actionCell.append(saveButton, deleteButton);
+          row.append(nameCell, actionCell);
+          tbody.appendChild(row);
+        });
+        playersContainer.replaceChildren(table);
+      }
+
+      createEventForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        clearMessage(createEventMessage);
+        const name = eventNameInput.value.trim();
+        if (!name) {
+          setMessage(createEventMessage, 'Event name is required.', 'error');
+          return;
+        }
+        try {
+          const response = await fetch('/admin/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ name })
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.error || 'Unable to create event');
+          }
+          setMessage(createEventMessage, `Event created: ${payload.name}`, 'success');
+          eventNameInput.value = '';
+          await loadEvents();
+        } catch (error) {
+          setMessage(createEventMessage, error.message, 'error');
+        }
+      });
+
+      eventSelect.addEventListener('change', () => {
+        if (!eventSelect.value) return;
+        loadEntries(eventSelect.value);
+      });
+
+      async function init() {
+        try {
+          await Promise.all([loadPlayers(), loadDecks(), loadEvents(), loadPlayerAdminList()]);
+        } catch (error) {
+          setMessage(entriesMessage, error.message, 'error');
+        }
+      }
+
+      logoutButton.addEventListener('click', async () => {
+        try {
+          await fetch('/admin/logout', { method: 'POST' });
+        } finally {
+          window.location.href = '/admin/login';
+        }
+      });
+
+      init();
+    </script>
+  </body>
+</html>

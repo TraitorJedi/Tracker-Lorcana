@@ -115,6 +115,9 @@
         color: #fecaca;
         border: 1px solid rgba(239, 68, 68, 0.4);
       }
+      .hidden {
+        display: none;
+      }
       .result-card {
         background: rgba(15, 23, 42, 0.85);
         border-radius: 12px;
@@ -140,12 +143,25 @@
     <main>
       <header>
         <h1>Lorcana Match Reporter</h1>
-        <p>Record matchups and look up the latest deck a player has submitted.</p>
+        <p>Select the event, then record color choices or look up your next opponent.</p>
       </header>
 
       <section>
+        <h2>Select Event</h2>
+        <form id="event-form">
+          <label>
+            Event
+            <select id="event-select" name="event" required>
+              <option value="" disabled selected>Select an event</option>
+            </select>
+          </label>
+        </form>
+        <div id="event-message" role="status"></div>
+      </section>
+
+      <section>
         <h2>Report a Matchup</h2>
-        <form id="report-form">
+        <form id="report-form" class="hidden">
           <label>
             Player name
             <input
@@ -168,12 +184,13 @@
 
           <button type="submit">Submit matchup</button>
         </form>
+        <div id="confirmation-card" class="result-card hidden"></div>
         <div id="report-message" role="status"></div>
       </section>
 
       <section>
         <h2>Lookup a Player</h2>
-        <form id="lookup-form" class="inline">
+        <form id="lookup-form" class="inline hidden">
           <input
             id="lookup-input"
             name="lookup"
@@ -189,13 +206,17 @@
     </main>
 
     <script>
+      const eventSelect = document.getElementById('event-select');
+      const eventMessage = document.getElementById('event-message');
       const playerDatalist = document.getElementById('player-names');
       const deckSelect = document.getElementById('deck-select');
       const reportForm = document.getElementById('report-form');
       const reportMessage = document.getElementById('report-message');
+      const confirmationCard = document.getElementById('confirmation-card');
       const lookupForm = document.getElementById('lookup-form');
       const lookupResult = document.getElementById('lookup-result');
       const playerMap = new Map();
+      let activeEvent = null;
 
       function setMessage(element, message, type) {
         element.textContent = message || '';
@@ -205,6 +226,35 @@
       function clearMessage(element) {
         element.textContent = '';
         element.className = '';
+      }
+
+      function setEventLocked(isLocked) {
+        reportForm.classList.toggle('hidden', isLocked);
+        lookupForm.classList.toggle('hidden', isLocked);
+        confirmationCard.classList.add('hidden');
+        if (isLocked) {
+          reportForm.reset();
+          lookupForm.reset();
+          deckSelect.selectedIndex = 0;
+        }
+      }
+
+      async function loadEvents() {
+        try {
+          const response = await fetch('/events');
+          if (!response.ok) throw new Error('Unable to load events');
+          const events = await response.json();
+          eventSelect.replaceChildren(
+            new Option('Select an event', '', true, true),
+            ...events.map((event) => new Option(event.name, event.id))
+          );
+          if (!events.length) {
+            setMessage(eventMessage, 'No events found. Ask an admin to create one.', 'error');
+          }
+        } catch (error) {
+          console.error(error);
+          setMessage(eventMessage, error.message, 'error');
+        }
       }
 
       async function loadPlayers() {
@@ -240,13 +290,31 @@
         }
       }
 
+      eventSelect.addEventListener('change', () => {
+        const selectedId = eventSelect.value;
+        if (!selectedId) {
+          activeEvent = null;
+          setEventLocked(true);
+          return;
+        }
+        activeEvent = { id: selectedId, name: eventSelect.options[eventSelect.selectedIndex].text };
+        clearMessage(eventMessage);
+        setEventLocked(false);
+      });
+
       reportForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         clearMessage(reportMessage);
+        confirmationCard.classList.add('hidden');
 
         const formData = new FormData(reportForm);
         const player = formData.get('player')?.trim();
         const deck = formData.get('deck');
+
+        if (!activeEvent) {
+          setMessage(reportMessage, 'Select an event first.', 'error');
+          return;
+        }
 
         if (!player || !deck) {
           setMessage(reportMessage, 'Player and deck are required.', 'error');
@@ -254,16 +322,13 @@
         }
 
         const matchedPlayer = playerMap.get(player.toLowerCase());
-        if (!matchedPlayer) {
-          setMessage(reportMessage, 'Select an existing player from the list.', 'error');
-          return;
-        }
+        const selectedPlayer = matchedPlayer || player;
 
         try {
           const response = await fetch('/submit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player: matchedPlayer, deck })
+            body: JSON.stringify({ event_id: activeEvent.id, player: selectedPlayer, deck })
           });
 
           const payload = await response.json();
@@ -272,6 +337,13 @@
           }
 
           setMessage(reportMessage, payload.message || 'Matchup recorded!', 'success');
+          confirmationCard.innerHTML = `
+            <div><strong>Event:</strong> ${activeEvent.name}</div>
+            <div><strong>Player:</strong> ${selectedPlayer}</div>
+            <div><strong>Deck:</strong> ${deck}</div>
+            <div><strong>Status:</strong> Entry saved. Review the details above.</div>
+          `;
+          confirmationCard.classList.remove('hidden');
           reportForm.reset();
           // Ensure the blank option remains selected after reset
           deckSelect.selectedIndex = 0;
@@ -288,6 +360,10 @@
 
         const formData = new FormData(lookupForm);
         const player = formData.get('lookup')?.trim();
+        if (!activeEvent) {
+          setMessage(lookupResult, 'Select an event first.', 'error');
+          return;
+        }
         if (!player) {
           setMessage(lookupResult, 'Enter a player name to search.', 'error');
           return;
@@ -296,7 +372,9 @@
         const lookupName = playerMap.get(player.toLowerCase()) || player;
 
         try {
-          const response = await fetch(`/lookup/${encodeURIComponent(lookupName)}`);
+          const response = await fetch(
+            `/lookup?event=${encodeURIComponent(activeEvent.id)}&player=${encodeURIComponent(lookupName)}`
+          );
           if (response.status === 404) {
             setMessage(lookupResult, 'No matchup found for this player yet.', 'error');
             return;
@@ -309,6 +387,7 @@
           const card = document.createElement('div');
           card.className = 'result-card';
           card.innerHTML = `
+            <div><strong>Event:</strong> ${activeEvent.name}</div>
             <div><strong>Player:</strong> ${payload.player || lookupName}</div>
             <div><strong>Deck:</strong> ${payload.deck || 'Unknown'}</div>
             ${payload.created_at ? `<div><strong>Reported:</strong> ${new Date(payload.created_at).toLocaleString()}</div>` : ''}
@@ -320,8 +399,10 @@
         }
       });
 
+      setEventLocked(true);
       loadPlayers();
       loadDecks();
+      loadEvents();
     </script>
   </body>
 </html>

@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Local env files
+.env
+
+# Supabase local state
+.supabase/
+
+# Logs
+npm-debug.log*
+
+# OS files
+.DS_Store
