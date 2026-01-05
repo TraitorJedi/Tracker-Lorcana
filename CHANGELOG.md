@@ -28,3 +28,4 @@
 - Switch ink selection to dropdowns for improved mobile usability.
 - Lazy-load player autocomplete after the first character is typed.
 - Ignore `agent-files/` in git.
+- Pin Node.js engine to 24.x and add `.nvmrc`.
