@@ -13,3 +13,18 @@
 - Restore global player autocomplete for lookup and reporting.
 - Add admin player management to rename or delete global players.
 - Refresh event entries after admin player updates or deletions.
+- Replace deck dropdown with ink symbol buttons in the public UI.
+- Use Lorcana ink PNG assets for deck selection icons.
+- Add source note for ink icon assets.
+- Add blank image placeholder in agent files.
+- Serve static assets from `public/` so ink icons load.
+- Generate ink icon PNGs from `agent-files/ink-ref.png`.
+- Replace ink icons with provided official PNGs and clean up reference artifacts.
+- Normalize ink icon image dimensions for consistent layout.
+- Increase ink icon display size for better visibility.
+- Use nodemon for auto-reloading during local development.
+- Point ink icon references to PNG assets.
+- Split deck selection into two ink color choices.
+- Switch ink selection to dropdowns for improved mobile usability.
+- Lazy-load player autocomplete after the first character is typed.
+- Ignore `agent-files/` in git.

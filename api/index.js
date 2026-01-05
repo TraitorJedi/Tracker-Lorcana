@@ -8,6 +8,7 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 app.use(express.json());
 app.use(cors());
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Init Supabase client from env
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -136,9 +137,14 @@ app.get('/events', async (req, res) => {
   res.json(data || []);
 });
 
-// GET /players -> ["Nikita", "Tiana", ...]
+// GET /players?startsWith=A -> ["Nikita", "Tiana", ...]
 app.get('/players', async (req, res) => {
-  const { data, error } = await supabase.from('players').select('name').order('name', { ascending: true });
+  const startsWith = (req.query.startsWith || '').toString().trim();
+  let query = supabase.from('players').select('name');
+  if (startsWith) {
+    query = query.ilike('name', `${startsWith}%`);
+  }
+  const { data, error } = await query.order('name', { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
   res.json((data || []).map(p => p.name));
 });

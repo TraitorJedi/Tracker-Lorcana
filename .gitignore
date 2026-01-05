@@ -4,6 +4,9 @@ node_modules/
 # Local env files
 .env
 
+# Local agent assets
+agent-files/
+
 # Supabase local state
 .supabase/
 
@@ -12,3 +15,4 @@ npm-debug.log*
 
 # OS files
 .DS_Store
+*:Zone.Identifier

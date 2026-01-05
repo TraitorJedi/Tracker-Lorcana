@@ -4,7 +4,7 @@
   "description": "Express API for Lorcana match tracker using Supabase on Vercel",
   "main": "api/index.js",
   "scripts": {
-    "dev": "node api/index.js",
+    "dev": "nodemon api/index.js",
     "db:push": "supabase db push"
   },
   "engines": {
@@ -15,5 +15,8 @@
     "cors": "^2.8.5",
     "@supabase/supabase-js": "^2.45.0",
     "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }

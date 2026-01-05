@@ -100,6 +100,47 @@
         flex: 1;
         min-width: 200px;
       }
+      .deck-grid {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .deck-icons {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      .deck-plus {
+        color: rgba(248, 250, 252, 0.7);
+        font-weight: 700;
+      }
+      .deck-selection {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: rgba(248, 250, 252, 0.8);
+      }
+      .deck-text {
+        font-size: 0.95rem;
+        color: rgba(248, 250, 252, 0.8);
+      }
+      .ink-icon {
+        width: 42px;
+        height: 42px;
+        display: block;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 6px rgba(15, 23, 42, 0.6));
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        border: 0;
+      }
       .message {
         padding: 0.75rem 1rem;
         border-radius: 10px;
@@ -176,10 +217,19 @@
           </label>
 
           <label>
-            Deck
-            <select id="deck-select" name="deck" required>
-              <option value="" disabled selected>Select a deck</option>
+            Ink color 1
+            <select id="ink-select-1" name="ink1" required>
+              <option value="" disabled selected>Select ink color 1</option>
             </select>
+          </label>
+
+          <label>
+            Ink color 2
+            <select id="ink-select-2" name="ink2" required>
+              <option value="" disabled selected>Select ink color 2</option>
+            </select>
+            <input id="deck-input" name="deck" type="hidden" required />
+            <div id="deck-selection" class="deck-selection" aria-live="polite"></div>
           </label>
 
           <button type="submit">Submit matchup</button>
@@ -209,7 +259,10 @@
       const eventSelect = document.getElementById('event-select');
       const eventMessage = document.getElementById('event-message');
       const playerDatalist = document.getElementById('player-names');
-      const deckSelect = document.getElementById('deck-select');
+      const inkSelect1 = document.getElementById('ink-select-1');
+      const inkSelect2 = document.getElementById('ink-select-2');
+      const deckInput = document.getElementById('deck-input');
+      const deckSelection = document.getElementById('deck-selection');
       const reportForm = document.getElementById('report-form');
       const reportMessage = document.getElementById('report-message');
       const confirmationCard = document.getElementById('confirmation-card');
@@ -217,6 +270,49 @@
       const lookupResult = document.getElementById('lookup-result');
       const playerMap = new Map();
       let activeEvent = null;
+      let inkColor1 = '';
+      let inkColor2 = '';
+
+      const INK_ORDER = ['Amber', 'Amethyst', 'Emerald', 'Ruby', 'Sapphire', 'Steel'];
+      const INK_SYMBOLS = {
+        Amber: '/ink/amber.png',
+        Amethyst: '/ink/amethyst.png',
+        Emerald: '/ink/emerald.png',
+        Ruby: '/ink/ruby.png',
+        Sapphire: '/ink/sapphire.png',
+        Steel: '/ink/steel.png'
+      };
+
+      function renderInkIcon(color) {
+        const src = INK_SYMBOLS[color] || '';
+        return `
+          <img class="ink-icon" src="${src}" alt="${color} ink" />
+        `;
+      }
+
+      function normalizeDeckName(colorA, colorB) {
+        const colors = [colorA, colorB].filter(Boolean);
+        if (colors.length !== 2) return '';
+        colors.sort((a, b) => INK_ORDER.indexOf(a) - INK_ORDER.indexOf(b));
+        return colors.join('/');
+      }
+
+      function renderDeckIcons(deckName, showText = false) {
+        if (!deckName) return '';
+        const colors = deckName.split('/').map((c) => c.trim());
+        const icons = colors.map((color) => renderInkIcon(color)).join('<span class="deck-plus">+</span>');
+        const label = showText ? `<span class="deck-text">${deckName}</span>` : `<span class="sr-only">${deckName}</span>`;
+        return `<div class="deck-icons">${icons}</div>${label}`;
+      }
+
+      function clearDeckSelection() {
+        deckInput.value = '';
+        deckSelection.innerHTML = '';
+        inkColor1 = '';
+        inkColor2 = '';
+        inkSelect1.selectedIndex = 0;
+        inkSelect2.selectedIndex = 0;
+      }
 
       function setMessage(element, message, type) {
         element.textContent = message || '';
@@ -235,7 +331,7 @@
         if (isLocked) {
           reportForm.reset();
           lookupForm.reset();
-          deckSelect.selectedIndex = 0;
+          clearDeckSelection();
         }
       }
 
@@ -257,9 +353,10 @@
         }
       }
 
-      async function loadPlayers() {
+      async function loadPlayers(startsWith = '') {
         try {
-          const response = await fetch('/players');
+          const query = startsWith ? `?startsWith=${encodeURIComponent(startsWith)}` : '';
+          const response = await fetch(`/players${query}`);
           if (!response.ok) throw new Error('Unable to load players');
           const players = await response.json();
           playerMap.clear();
@@ -276,18 +373,21 @@
         }
       }
 
-      async function loadDecks() {
-        try {
-          const response = await fetch('/decks');
-          if (!response.ok) throw new Error('Unable to load decks');
-          const decks = await response.json();
-          deckSelect.replaceChildren(
-            new Option('Select a deck', '', true, true),
-            ...decks.map((name) => new Option(name, name))
-          );
-        } catch (error) {
-          console.error(error);
+      function updateDeckSelection() {
+        const deckName = normalizeDeckName(inkColor1, inkColor2);
+        deckInput.value = deckName;
+        if (deckName) {
+          deckSelection.innerHTML = renderDeckIcons(deckName, true);
+        } else {
+          deckSelection.innerHTML = '';
         }
+      }
+
+      function renderInkOptions(select) {
+        select.replaceChildren(
+          new Option(select.options[0].textContent, '', true, true),
+          ...INK_ORDER.map((color) => new Option(color, color))
+        );
       }
 
       eventSelect.addEventListener('change', () => {
@@ -309,7 +409,7 @@
 
         const formData = new FormData(reportForm);
         const player = formData.get('player')?.trim();
-        const deck = formData.get('deck');
+        const deck = deckInput.value;
 
         if (!activeEvent) {
           setMessage(reportMessage, 'Select an event first.', 'error');
@@ -318,6 +418,10 @@
 
         if (!player || !deck) {
           setMessage(reportMessage, 'Player and deck are required.', 'error');
+          return;
+        }
+        if (inkColor1 === inkColor2) {
+          setMessage(reportMessage, 'Choose two different ink colors.', 'error');
           return;
         }
 
@@ -340,13 +444,12 @@
           confirmationCard.innerHTML = `
             <div><strong>Event:</strong> ${activeEvent.name}</div>
             <div><strong>Player:</strong> ${selectedPlayer}</div>
-            <div><strong>Deck:</strong> ${deck}</div>
+            <div><strong>Deck:</strong> ${renderDeckIcons(deck, true)}</div>
             <div><strong>Status:</strong> Entry saved. Review the details above.</div>
           `;
           confirmationCard.classList.remove('hidden');
           reportForm.reset();
-          // Ensure the blank option remains selected after reset
-          deckSelect.selectedIndex = 0;
+          clearDeckSelection();
           await loadPlayers();
         } catch (error) {
           console.error(error);
@@ -389,7 +492,7 @@
           card.innerHTML = `
             <div><strong>Event:</strong> ${activeEvent.name}</div>
             <div><strong>Player:</strong> ${payload.player || lookupName}</div>
-            <div><strong>Deck:</strong> ${payload.deck || 'Unknown'}</div>
+            <div><strong>Deck:</strong> ${payload.deck ? renderDeckIcons(payload.deck, true) : 'Unknown'}</div>
             ${payload.created_at ? `<div><strong>Reported:</strong> ${new Date(payload.created_at).toLocaleString()}</div>` : ''}
           `;
           lookupResult.replaceChildren(card);
@@ -400,9 +503,38 @@
       });
 
       setEventLocked(true);
-      loadPlayers();
-      loadDecks();
       loadEvents();
+      playerDatalist.replaceChildren();
+      const playerInput = document.getElementById('player-input');
+      const lookupInput = document.getElementById('lookup-input');
+
+      async function handlePlayerAutocomplete(value) {
+        const trimmed = value.trim();
+        if (!trimmed) {
+          playerMap.clear();
+          playerDatalist.replaceChildren();
+          return;
+        }
+        await loadPlayers(trimmed[0]);
+      }
+
+      playerInput.addEventListener('input', (event) => {
+        handlePlayerAutocomplete(event.target.value);
+      });
+
+      lookupInput.addEventListener('input', (event) => {
+        handlePlayerAutocomplete(event.target.value);
+      });
+      renderInkOptions(inkSelect1);
+      renderInkOptions(inkSelect2);
+      inkSelect1.addEventListener('change', () => {
+        inkColor1 = inkSelect1.value;
+        updateDeckSelection();
+      });
+      inkSelect2.addEventListener('change', () => {
+        inkColor2 = inkSelect2.value;
+        updateDeckSelection();
+      });
     </script>
   </body>
 </html>
