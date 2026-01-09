@@ -176,6 +176,32 @@ app.get('/events', async (req, res) => {
   res.json(data || []);
 });
 
+app.get('/events/:eventId/summary', async (req, res) => {
+  const eventId = req.params.eventId;
+  const { data, error } = await supabase.from('submissions').select('deck_id').eq('event_id', eventId);
+  if (error) return res.status(500).json({ error: error.message });
+
+  const deckIds = Array.from(new Set((data || []).map((row) => row.deck_id).filter(Boolean)));
+  const { data: decks, error: dErr } = deckIds.length
+    ? await supabase.from('decks').select('id,name').in('id', deckIds)
+    : { data: [] };
+  if (dErr) return res.status(500).json({ error: dErr.message });
+
+  const deckMap = new Map((decks || []).map((deck) => [deck.id, deck.name]));
+  const counts = new Map();
+  (data || []).forEach((row) => {
+    const deckName = deckMap.get(row.deck_id);
+    if (!deckName) return;
+    counts.set(deckName, (counts.get(deckName) || 0) + 1);
+  });
+
+  const summary = Array.from(counts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  res.json({ total: data?.length || 0, decks: summary });
+});
+
 // GET /players?startsWith=A -> ["Nikita", "Tiana", ...]
 app.get('/players', async (req, res) => {
   const startsWith = (req.query.startsWith || '').toString().trim();
