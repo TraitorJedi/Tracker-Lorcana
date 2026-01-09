@@ -337,6 +337,17 @@ app.post('/admin/events', requireAdmin, async (req, res) => {
   res.json(data);
 });
 
+app.patch('/admin/events/:eventId', requireAdmin, async (req, res) => {
+  const eventId = req.params.eventId;
+  const name = (req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Event name is required.' });
+
+  const { data, error } = await supabase.from('events').update({ name }).eq('id', eventId).select('id,name').single();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'Event not found.' });
+  res.json(data);
+});
+
 app.get('/admin/events/:eventId/entries', requireAdmin, async (req, res) => {
   const eventId = req.params.eventId;
   const { data, error } = await supabase

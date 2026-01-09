@@ -110,6 +110,9 @@
         color: #fecaca;
         border: 1px solid rgba(239, 68, 68, 0.4);
       }
+      .hidden {
+        display: none;
+      }
       table {
         width: 100%;
         border-collapse: collapse;
@@ -189,6 +192,11 @@
             </select>
           </label>
         </form>
+        <form id="rename-event-form" class="inline hidden">
+          <input id="rename-event-input" type="text" placeholder="Rename event" required />
+          <button type="submit" class="secondary">Rename event</button>
+        </form>
+        <div id="rename-event-message" role="status"></div>
         <div id="entries-message" role="status"></div>
         <datalist id="admin-player-names"></datalist>
         <div id="entries-container">
@@ -220,6 +228,9 @@
       const createEventForm = document.getElementById('create-event-form');
       const eventNameInput = document.getElementById('event-name-input');
       const createEventMessage = document.getElementById('create-event-message');
+      const renameEventForm = document.getElementById('rename-event-form');
+      const renameEventInput = document.getElementById('rename-event-input');
+      const renameEventMessage = document.getElementById('rename-event-message');
       const entriesContainer = document.getElementById('entries-container');
       const entriesMessage = document.getElementById('entries-message');
       const adminPlayerNames = document.getElementById('admin-player-names');
@@ -233,6 +244,7 @@
 
       let players = [];
       let decks = [];
+      let events = [];
 
       function setMessage(element, message, type) {
         element.textContent = message || '';
@@ -267,7 +279,7 @@
         const response = await fetch('/admin/events', { credentials: 'same-origin' });
         if (response.status === 401) throw new Error('Unauthorized. Refresh to re-enter the admin password.');
         if (!response.ok) throw new Error('Unable to load events');
-        const events = await response.json();
+        events = await response.json();
         eventSelect.replaceChildren(
           new Option('Select an event', '', true, true),
           ...events.map((event) => new Option(event.name, event.id))
@@ -275,6 +287,12 @@
         if (!events.length) {
           entriesContainer.innerHTML = '<p class="muted">No events yet. Create one above.</p>';
         }
+      }
+
+      function getSelectedEventName() {
+        return eventSelect.value
+          ? eventSelect.options[eventSelect.selectedIndex]?.textContent || ''
+          : '';
       }
 
       function buildOptions(list, selectedValue) {
@@ -554,9 +572,50 @@
       });
 
       eventSelect.addEventListener('change', () => {
-        if (!eventSelect.value) return;
+        if (!eventSelect.value) {
+          renameEventForm.classList.add('hidden');
+          renameEventInput.value = '';
+          clearMessage(renameEventMessage);
+          return;
+        }
+        renameEventForm.classList.remove('hidden');
+        renameEventInput.value = getSelectedEventName();
+        clearMessage(renameEventMessage);
         loadEntries(eventSelect.value);
         loadValidationStatus(eventSelect.value);
+      });
+
+      renameEventForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        clearMessage(renameEventMessage);
+        const eventId = eventSelect.value;
+        const name = renameEventInput.value.trim();
+        if (!eventId) {
+          setMessage(renameEventMessage, 'Select an event to rename.', 'error');
+          return;
+        }
+        if (!name) {
+          setMessage(renameEventMessage, 'Event name is required.', 'error');
+          return;
+        }
+        try {
+          const response = await fetch(`/admin/events/${eventId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ name })
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.error || 'Unable to rename event');
+          }
+          setMessage(renameEventMessage, `Event renamed to ${payload.name}.`, 'success');
+          await loadEvents();
+          eventSelect.value = eventId;
+          renameEventInput.value = payload.name;
+        } catch (error) {
+          setMessage(renameEventMessage, error.message, 'error');
+        }
       });
 
       async function init() {
