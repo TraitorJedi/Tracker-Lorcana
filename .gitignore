@@ -3,15 +3,34 @@ node_modules/
 
 # Local env files
 .env
+.env.local
+.env.*.local
 
 # Local agent assets
 agent-files/
 
 # Supabase local state
 .supabase/
+supabase/
 
 # Logs
 npm-debug.log*
+*.log
+
+# Build/test artifacts
+coverage/
+dist/
+build/
+
+# Tooling caches
+.vercel/
+.cache/
+.npm/
+.eslintcache
+
+# Editor settings
+.idea/
+.vscode/
 
 # OS files
 .DS_Store

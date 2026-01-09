@@ -190,8 +190,19 @@
           </label>
         </form>
         <div id="entries-message" role="status"></div>
+        <datalist id="admin-player-names"></datalist>
         <div id="entries-container">
           <p class="muted">Select an event to view its entries.</p>
+        </div>
+        <div class="result-card" style="margin-top: 1rem;">
+          <strong>Validation List</strong>
+          <p class="muted">Attach a CSV of usernames to restrict submissions to this event.</p>
+          <div class="inline">
+            <input id="validation-file" type="file" accept=".csv" />
+            <button id="validation-upload" type="button">Upload CSV</button>
+            <button id="validation-clear" type="button" class="secondary">Clear validation</button>
+          </div>
+          <div id="validation-status" class="muted"></div>
         </div>
       </section>
 
@@ -211,9 +222,14 @@
       const createEventMessage = document.getElementById('create-event-message');
       const entriesContainer = document.getElementById('entries-container');
       const entriesMessage = document.getElementById('entries-message');
+      const adminPlayerNames = document.getElementById('admin-player-names');
       const logoutButton = document.getElementById('logout-button');
       const playersContainer = document.getElementById('players-container');
       const playersMessage = document.getElementById('players-message');
+      const validationFile = document.getElementById('validation-file');
+      const validationUpload = document.getElementById('validation-upload');
+      const validationClear = document.getElementById('validation-clear');
+      const validationStatus = document.getElementById('validation-status');
 
       let players = [];
       let decks = [];
@@ -232,6 +248,13 @@
         const response = await fetch('/players', { credentials: 'same-origin' });
         if (!response.ok) throw new Error('Unable to load players');
         players = await response.json();
+        adminPlayerNames.replaceChildren(
+          ...players.map((name) => {
+            const option = document.createElement('option');
+            option.value = name;
+            return option;
+          })
+        );
       }
 
       async function loadDecks() {
@@ -255,16 +278,31 @@
       }
 
       function buildOptions(list, selectedValue) {
-        return list.map((value) => {
+        const normalizedSelected = selectedValue ? selectedValue.trim().toLowerCase() : '';
+        let found = false;
+        const options = list.map((value) => {
           const option = new Option(value, value);
-          if (value === selectedValue) option.selected = true;
+          if (normalizedSelected && value.trim().toLowerCase() === normalizedSelected) {
+            option.selected = true;
+            found = true;
+          }
           return option;
         });
+        if (selectedValue && !found) {
+          const missing = new Option(`${selectedValue} (missing)`, selectedValue, true, true);
+          options.unshift(missing);
+        }
+        if (!selectedValue && list.length) {
+          options.unshift(new Option('Select...', '', true, true));
+        }
+        return options;
       }
 
       async function loadEntries(eventId) {
         clearMessage(entriesMessage);
         entriesContainer.innerHTML = '<p class="muted">Loading entries...</p>';
+        await loadPlayers();
+        await loadDecks();
         const response = await fetch(`/admin/events/${eventId}/entries`, { credentials: 'same-origin' });
         if (response.status === 401) {
           setMessage(entriesMessage, 'Unauthorized. Refresh to re-enter the admin password.', 'error');
@@ -299,9 +337,12 @@
           row.dataset.id = entry.id;
 
           const playerCell = document.createElement('td');
-          const playerSelect = document.createElement('select');
-          playerSelect.append(...buildOptions(players, entry.player));
-          playerCell.appendChild(playerSelect);
+          const playerInput = document.createElement('input');
+          playerInput.type = 'text';
+          playerInput.value = entry.player || '';
+          playerInput.placeholder = 'Player name';
+          playerInput.setAttribute('list', 'admin-player-names');
+          playerCell.appendChild(playerInput);
 
           const deckCell = document.createElement('td');
           const deckSelect = document.createElement('select');
@@ -322,7 +363,7 @@
           saveButton.addEventListener('click', async () => {
             try {
               const payload = {
-                player: playerSelect.value,
+                player: playerInput.value,
                 deck: deckSelect.value
               };
               const updateResponse = await fetch(`/admin/entries/${entry.id}`, {
@@ -365,6 +406,24 @@
         });
 
         entriesContainer.replaceChildren(table);
+      }
+
+      async function loadValidationStatus(eventId) {
+        validationStatus.textContent = '';
+        if (!eventId) return;
+        const response = await fetch(`/admin/events/${eventId}/validation`, { credentials: 'same-origin' });
+        if (!response.ok) {
+          validationStatus.textContent = 'Unable to load validation status.';
+          return;
+        }
+        const data = await response.json();
+        if (!data.enabled) {
+          validationStatus.textContent = 'No validation list assigned.';
+          return;
+        }
+        const when = data.created_at ? new Date(data.created_at).toLocaleString() : 'Unknown time';
+        const filename = data.source_filename || 'validation.csv';
+        validationStatus.textContent = `Active: ${data.count} players from ${filename} (${when}).`;
       }
 
       async function loadPlayerAdminList() {
@@ -497,6 +556,7 @@
       eventSelect.addEventListener('change', () => {
         if (!eventSelect.value) return;
         loadEntries(eventSelect.value);
+        loadValidationStatus(eventSelect.value);
       });
 
       async function init() {
@@ -512,6 +572,58 @@
           await fetch('/admin/logout', { method: 'POST' });
         } finally {
           window.location.href = '/admin/login';
+        }
+      });
+
+      validationUpload.addEventListener('click', async () => {
+        if (!eventSelect.value) {
+          setMessage(entriesMessage, 'Select an event before uploading a validation list.', 'error');
+          return;
+        }
+        const file = validationFile.files?.[0];
+        if (!file) {
+          setMessage(entriesMessage, 'Choose a CSV file to upload.', 'error');
+          return;
+        }
+        try {
+          const csvText = await file.text();
+          const response = await fetch(`/admin/events/${eventSelect.value}/validation/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ filename: file.name, csv: csvText })
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.error || 'Unable to import validation list.');
+          }
+          setMessage(entriesMessage, `Validation list imported (${payload.count} players).`, 'success');
+          validationFile.value = '';
+          await loadValidationStatus(eventSelect.value);
+        } catch (error) {
+          setMessage(entriesMessage, error.message, 'error');
+        }
+      });
+
+      validationClear.addEventListener('click', async () => {
+        if (!eventSelect.value) {
+          setMessage(entriesMessage, 'Select an event before clearing validation.', 'error');
+          return;
+        }
+        if (!confirm('Clear validation list for this event?')) return;
+        try {
+          const response = await fetch(`/admin/events/${eventSelect.value}/validation`, {
+            method: 'DELETE',
+            credentials: 'same-origin'
+          });
+          if (!response.ok) {
+            const payload = await response.json();
+            throw new Error(payload.error || 'Unable to clear validation list.');
+          }
+          setMessage(entriesMessage, 'Validation list cleared.', 'success');
+          await loadValidationStatus(eventSelect.value);
+        } catch (error) {
+          setMessage(entriesMessage, error.message, 'error');
         }
       });
 

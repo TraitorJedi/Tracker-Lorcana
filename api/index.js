@@ -6,7 +6,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cors());
 app.use(express.static(path.join(__dirname, '../public')));
 
@@ -25,6 +25,45 @@ const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '');
 const frontendHtmlPath = path.join(__dirname, '../public/index.html');
 const adminHtmlPath = path.join(__dirname, '../public/admin.html');
 const adminLoginHtmlPath = path.join(__dirname, '../public/admin-login.html');
+
+function parseCsvNames(csvText) {
+  const lines = (csvText || '').split(/\r?\n/);
+  const names = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let value = '';
+    if (line.startsWith('"')) {
+      const end = line.indexOf('",');
+      if (end !== -1) {
+        value = line.slice(1, end).replace(/""/g, '"');
+      } else if (line.endsWith('"')) {
+        value = line.slice(1, -1).replace(/""/g, '"');
+      } else {
+        value = line.slice(1).replace(/""/g, '"');
+      }
+    } else {
+      value = line.split(',')[0];
+    }
+    const cleaned = value.trim();
+    if (!cleaned || cleaned.toLowerCase() === 'username') continue;
+    names.push(cleaned);
+  }
+  return names;
+}
+
+function describeSupabaseError(error) {
+  if (!error) return 'Unknown error';
+  const parts = [error.message, error.details, error.hint, error.code].filter(Boolean);
+  return parts.join(' | ') || 'Unknown error';
+}
+
+function chunkArray(items, size) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
 
 function getAdminSessionToken() {
   if (!ADMIN_PASSWORD) return '';
@@ -160,20 +199,52 @@ app.get('/decks', async (req, res) => {
 app.post('/submit', async (req, res) => {
   try {
     const { event_id: eventId, player, deck } = req.body || {};
-    if (!eventId || !player || !deck) return res.status(400).json({ error: 'Missing "event_id", "player", or "deck"' });
+    const playerName = (player || '').toString().trim();
+    if (!eventId || !playerName || !deck) {
+      return res.status(400).json({ error: 'Missing "event_id", "player", or "deck"' });
+    }
 
     const { data: event, error: eventErr } = await supabase.from('events').select('id,name').eq('id', eventId).single();
     if (eventErr) return res.status(400).json({ error: 'Event not found.' });
 
     // Ensure player exists
-    let { data: p, error: pErr } = await supabase.from('players').select('id,name').eq('name', player).single();
-    if (pErr && pErr.code !== 'PGRST116') { // not "Results contain 0 rows"
+    let { data: p, error: pErr } = await supabase.from('players').select('id,name').eq('name', playerName).single();
+    if (pErr && pErr.code !== 'PGRST116') {
       return res.status(500).json({ error: pErr.message });
     }
     if (!p) {
-      const created = await supabase.from('players').insert({ name: player }).select('id,name').single();
+      const { data: fallback, error: fallbackErr } = await supabase
+        .from('players')
+        .select('id,name')
+        .ilike('name', playerName)
+        .limit(1)
+        .maybeSingle();
+      if (fallbackErr) return res.status(500).json({ error: fallbackErr.message });
+      if (fallback) p = fallback;
+    }
+    if (!p) {
+      const created = await supabase.from('players').insert({ name: playerName }).select('id,name').single();
       if (created.error) return res.status(500).json({ error: created.error.message });
       p = created.data;
+    }
+
+    const { data: validation, error: validationErr } = await supabase
+      .from('event_validations')
+      .select('id')
+      .eq('event_id', event.id)
+      .maybeSingle();
+    if (validationErr) return res.status(500).json({ error: validationErr.message });
+    if (validation) {
+      const { data: allowed, error: allowedErr } = await supabase
+        .from('event_validation_players')
+        .select('id')
+        .eq('event_id', event.id)
+        .eq('player_id', p.id)
+        .maybeSingle();
+      if (allowedErr) return res.status(500).json({ error: allowedErr.message });
+      if (!allowed) {
+        return res.status(400).json({ error: 'Player is not on the validation list for this event.' });
+      }
     }
 
     // Require deck to already exist (from your seeded list)
@@ -201,12 +272,19 @@ app.get('/lookup', async (req, res) => {
   if (!eventId || !playerName) {
     return res.status(400).json({ error: 'Missing "event" or "player".' });
   }
-  // Latest submission joined to players & decks via PostgREST embedding (foreign keys required)
+  const { data: player, error: playerErr } = await supabase
+    .from('players')
+    .select('id,name')
+    .eq('name', playerName)
+    .maybeSingle();
+  if (playerErr) return res.status(500).json({ error: playerErr.message });
+  if (!player) return res.status(404).json({ message: 'No information on player deck yet.' });
+
   const { data, error } = await supabase
     .from('submissions')
-    .select(`created_at, players(name), decks(name)`)
+    .select('created_at, decks(name)')
     .eq('event_id', eventId)
-    .eq('players.name', playerName)
+    .eq('player_id', player.id)
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -214,7 +292,7 @@ app.get('/lookup', async (req, res) => {
   if (!data || !data.length) return res.status(404).json({ message: 'No information on player deck yet.' });
 
   const row = data[0];
-  return res.json({ player: row.players?.name || playerName, deck: row.decks?.name || null, created_at: row.created_at });
+  return res.json({ player: player.name, deck: row.decks?.name || null, created_at: row.created_at });
 });
 
 // Admin endpoints
@@ -237,16 +315,30 @@ app.get('/admin/events/:eventId/entries', requireAdmin, async (req, res) => {
   const eventId = req.params.eventId;
   const { data, error } = await supabase
     .from('submissions')
-    .select('id, created_at, players(name), decks(name)')
+    .select('id, created_at, player_id, deck_id')
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
 
+  const playerIds = Array.from(new Set((data || []).map((row) => row.player_id).filter(Boolean)));
+  const deckIds = Array.from(new Set((data || []).map((row) => row.deck_id).filter(Boolean)));
+
+  const [playersResp, decksResp] = await Promise.all([
+    playerIds.length ? supabase.from('players').select('id,name').in('id', playerIds) : { data: [] },
+    deckIds.length ? supabase.from('decks').select('id,name').in('id', deckIds) : { data: [] }
+  ]);
+
+  if (playersResp.error) return res.status(500).json({ error: playersResp.error.message });
+  if (decksResp.error) return res.status(500).json({ error: decksResp.error.message });
+
+  const playerMap = new Map((playersResp.data || []).map((player) => [player.id, player.name]));
+  const deckMap = new Map((decksResp.data || []).map((deck) => [deck.id, deck.name]));
+
   const entries = (data || []).map((row) => ({
     id: row.id,
     created_at: row.created_at,
-    player: row.players?.name || '',
-    deck: row.decks?.name || ''
+    player: playerMap.get(row.player_id) || '',
+    deck: deckMap.get(row.deck_id) || ''
   }));
   res.json(entries);
 });
@@ -295,6 +387,98 @@ app.delete('/admin/players/:playerId', requireAdmin, async (req, res) => {
   const playerId = req.params.playerId;
   const { error } = await supabase.from('players').delete().eq('id', playerId);
   if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+app.get('/admin/events/:eventId/validation', requireAdmin, async (req, res) => {
+  const eventId = req.params.eventId;
+  const { data: validation, error: validationErr } = await supabase
+    .from('event_validations')
+    .select('id, source_filename, created_at')
+    .eq('event_id', eventId)
+    .maybeSingle();
+  if (validationErr) return res.status(500).json({ error: validationErr.message });
+  if (!validation) return res.json({ enabled: false, count: 0 });
+
+  const { count, error: countErr } = await supabase
+    .from('event_validation_players')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId);
+  if (countErr) return res.status(500).json({ error: countErr.message });
+
+  res.json({
+    enabled: true,
+    count: count || 0,
+    source_filename: validation.source_filename,
+    created_at: validation.created_at
+  });
+});
+
+app.post('/admin/events/:eventId/validation/import', requireAdmin, async (req, res) => {
+  const eventId = req.params.eventId;
+  const filename = (req.body?.filename || '').toString().trim();
+  const csvText = (req.body?.csv || '').toString();
+  if (!csvText) return res.status(400).json({ error: 'CSV content is required.' });
+
+  const names = parseCsvNames(csvText);
+  if (!names.length) return res.status(400).json({ error: 'No usernames found in CSV.' });
+
+  const uniqueNames = Array.from(new Set(names));
+  const playersByName = new Map();
+  for (const chunk of chunkArray(uniqueNames, 500)) {
+    const { data, error } = await supabase
+      .from('players')
+      .upsert(
+        chunk.map((name) => ({ name })),
+        { onConflict: 'name' }
+      )
+      .select('id,name');
+    if (error) {
+      console.error('Validation import: player upsert failed', error);
+      return res.status(500).json({ error: describeSupabaseError(error) });
+    }
+    (data || []).forEach((player) => {
+      if (player?.name && player?.id) {
+        playersByName.set(player.name, player.id);
+      }
+    });
+  }
+
+  const { error: clearErr } = await supabase.from('event_validation_players').delete().eq('event_id', eventId);
+  if (clearErr) {
+    console.error('Validation import: clear existing players failed', clearErr);
+    return res.status(500).json({ error: describeSupabaseError(clearErr) });
+  }
+
+  const mappings = uniqueNames
+    .map((name) => playersByName.get(name))
+    .filter(Boolean)
+    .map((playerId) => ({ event_id: eventId, player_id: playerId }));
+  for (const chunk of chunkArray(mappings, 1000)) {
+    const { error } = await supabase.from('event_validation_players').insert(chunk);
+    if (error) {
+      console.error('Validation import: insert mappings failed', error);
+      return res.status(500).json({ error: describeSupabaseError(error) });
+    }
+  }
+
+  const { error: validationErr } = await supabase
+    .from('event_validations')
+    .upsert({ event_id: eventId, source_filename: filename || 'validation.csv' }, { onConflict: 'event_id' });
+  if (validationErr) {
+    console.error('Validation import: upsert metadata failed', validationErr);
+    return res.status(500).json({ error: describeSupabaseError(validationErr) });
+  }
+
+  res.json({ ok: true, count: mappings.length, filename: filename || 'validation.csv' });
+});
+
+app.delete('/admin/events/:eventId/validation', requireAdmin, async (req, res) => {
+  const eventId = req.params.eventId;
+  const { error: clearErr } = await supabase.from('event_validation_players').delete().eq('event_id', eventId);
+  if (clearErr) return res.status(500).json({ error: clearErr.message });
+  const { error: metaErr } = await supabase.from('event_validations').delete().eq('event_id', eventId);
+  if (metaErr) return res.status(500).json({ error: metaErr.message });
   res.json({ ok: true });
 });
 

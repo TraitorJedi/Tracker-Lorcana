@@ -29,3 +29,17 @@
 - Lazy-load player autocomplete after the first character is typed.
 - Ignore `agent-files/` in git.
 - Pin Node.js engine to 24.x and add `.nvmrc`.
+- Add Playwright fallback to the roster scraper and record scraper dependencies.
+- Add direct API scraping to the roster scraper to avoid browser dependencies.
+- Save raw roster entries alongside de-duplicated usernames.
+- Add event validation lists with CSV import and enforcement on submissions.
+- Raise JSON payload limit to support larger validation CSV uploads.
+- Improve validation import error reporting and avoid name lookups that can fail on special characters.
+- Fix player lookup to filter by player_id so empty searches no longer return unrelated entries.
+- Load admin entries by id and map names to prevent random player labels.
+- Show a placeholder in admin entry selects when the current value is missing.
+- Refresh players and decks before rendering admin entries so newly added names appear.
+- Match player names case-insensitively on submission and in admin dropdowns to reduce false "missing" labels.
+- Replace the admin entry player dropdown with a text input using global player autocomplete.
+- Expand `.gitignore` to cover common build artifacts, editor settings, and Vercel metadata.
+- Ignore the local `supabase/` directory to keep SQL files out of GitHub.
