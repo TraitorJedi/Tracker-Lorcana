@@ -205,6 +205,9 @@
         justify-content: space-between;
         gap: 0.75rem;
       }
+      .summary-row .deck-icons {
+        gap: 0.25rem;
+      }
       .summary-label {
         display: grid;
         gap: 0.35rem;
@@ -212,6 +215,27 @@
       .summary-count {
         font-weight: 600;
         color: rgba(248, 250, 252, 0.75);
+      }
+      .summary-legend {
+        display: grid;
+        gap: 0.6rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .summary-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-size: 0.95rem;
+        color: rgba(248, 250, 252, 0.8);
+      }
+      .summary-swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 1px solid rgba(15, 23, 42, 0.6);
+        box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.35);
       }
       .summary-chart {
         width: 100%;
@@ -313,6 +337,7 @@
             </div>
             <div class="summary-card">
               <canvas id="summary-chart" class="summary-chart" aria-label="Deck distribution pie chart" role="img"></canvas>
+              <ul class="summary-legend" id="summary-legend"></ul>
             </div>
           </div>
           <div id="summary-message" role="status"></div>
@@ -338,6 +363,7 @@
       const summaryList = document.getElementById('summary-list');
       const summaryChart = document.getElementById('summary-chart');
       const summaryMessage = document.getElementById('summary-message');
+      const summaryLegend = document.getElementById('summary-legend');
       const playerMap = new Map();
       let activeEvent = null;
       let inkColor1 = '';
@@ -404,6 +430,7 @@
           lookupForm.reset();
           clearDeckSelection();
           summaryList.replaceChildren();
+          summaryLegend.replaceChildren();
           summaryTotal.textContent = 'Total submitted decks: 0';
           clearMessage(summaryMessage);
           drawSummaryChart([]);
@@ -470,7 +497,7 @@
         return Array.from({ length: count }, (_, index) => palette[index % palette.length]);
       }
 
-      function drawSummaryChart(data) {
+      function drawSummaryChart(data, colors = []) {
         const ctx = summaryChart.getContext('2d');
         const size = summaryChart.clientWidth || 240;
         const scale = window.devicePixelRatio || 1;
@@ -490,14 +517,13 @@
 
         const total = data.reduce((sum, item) => sum + item.count, 0);
         let startAngle = -Math.PI / 2;
-        const colors = getChartColors(data.length);
         data.forEach((item, index) => {
           const slice = (item.count / total) * Math.PI * 2;
           ctx.beginPath();
           ctx.moveTo(size / 2, size / 2);
           ctx.arc(size / 2, size / 2, size / 2 - 6, startAngle, startAngle + slice);
           ctx.closePath();
-          ctx.fillStyle = colors[index];
+          ctx.fillStyle = colors[index] || '#94a3b8';
           ctx.fill();
           startAngle += slice;
         });
@@ -505,6 +531,7 @@
 
       function renderSummary(summary) {
         summaryList.replaceChildren();
+        summaryLegend.replaceChildren();
         clearMessage(summaryMessage);
 
         const total = summary.total || 0;
@@ -516,19 +543,29 @@
           return;
         }
 
-        summary.decks.forEach((deck) => {
+        const colors = getChartColors(summary.decks.length);
+
+        summary.decks.forEach((deck, index) => {
           const percent = total ? Math.round((deck.count / total) * 100) : 0;
           const row = document.createElement('li');
           row.className = 'summary-row';
           row.innerHTML = `
             <div class="summary-label">
-              ${renderDeckIcons(deck.name, true)}
+              ${renderDeckIcons(deck.name, false)}
               <span class="summary-count">${deck.count} submissions • ${percent}%</span>
             </div>
           `;
           summaryList.appendChild(row);
+
+          const legendItem = document.createElement('li');
+          legendItem.className = 'summary-legend-item';
+          legendItem.innerHTML = `
+            <span class="summary-swatch" style="background: ${colors[index]};"></span>
+            ${renderDeckIcons(deck.name, true)}
+          `;
+          summaryLegend.appendChild(legendItem);
         });
-        drawSummaryChart(summary.decks);
+        drawSummaryChart(summary.decks, colors);
       }
 
       async function loadSummary(eventId) {
