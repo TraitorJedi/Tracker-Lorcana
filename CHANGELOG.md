@@ -34,6 +34,9 @@
 - Save raw roster entries alongside de-duplicated usernames.
 - Add event validation lists with CSV import and enforcement on submissions.
 - Raise JSON payload limit to support larger validation CSV uploads.
+- Add public event summary endpoint and UI with deck totals and pie chart.
+- Add legend colors and icon-only summary list for event summaries.
+- Allow admins to rename events after selection.
 - Improve validation import error reporting and avoid name lookups that can fail on special characters.
 - Fix player lookup to filter by player_id so empty searches no longer return unrelated entries.
 - Load admin entries by id and map names to prevent random player labels.
